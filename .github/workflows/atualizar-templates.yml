@@ -5,7 +5,7 @@ on:
 
 # Duas alternativas para o futuro
 #Permite que você clique em um botão e rode o script a hora que quiser (Manual)
-  # workflow_dispatch: 
+  workflow_dispatch: 
     #Intrução de como dispatch funciona:
     #Vá no seu repositório modelo e clique na aba Actions
     #Na barra lateral esquerda, clique no nome do seu workflow: "Sincronizar Templates em Toda a Org".
