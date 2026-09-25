@@ -26,31 +26,43 @@ jobs:
         env:
           # O token administrativo que você cadastrou nas configurações do modelo
           PAT_TOKEN: ${{ secrets.ORGANIZATION_ADMIN_TOKEN }} 
-        run: |
+      run: |
           # 1. Pega o nome da Organização atual automaticamente
           ORG_NAME=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f1)
           MODEL_REPO=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f2)
 
           echo "Buscando repositórios da organização: $ORG_NAME"
 
-          # 2. Pergunta ao GitHub quais repositórios existem (traz até 100 por página)
-          REPOS=$(curl -s -H "Authorization: token $PAT_TOKEN" \
-            "https://github.com" | jq -r '.[].name')
+          # 2. Faz a chamada incluindo o cabeçalho recomendado do GitHub
+          RESPONSE=$(curl -s -H "Authorization: Bearer $PAT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://github.com")
 
-          # 3. Roda a atualização em cada um deles
+          # Validação: Se a resposta contiver a palavra "message" (comum em erros do GitHub), para o script com aviso claro
+          if echo "$RESPONSE" | grep -q '"message"'; then
+            echo "❌ Erro retornado pela API do GitHub. Verifique se o seu ORGANIZATION_ADMIN_TOKEN está correto e ativo."
+            echo "Resposta do GitHub: $RESPONSE"
+            exit 1
+          fi
+
+          # 3. Se passou na validação, extrai os nomes com segurança
+          REPOS=$(echo "$RESPONSE" | jq -r '.[].name')
+
+          # 4. Roda a atualização em cada um deles
           for REPO in $REPOS; do
             # Pula o próprio repositório modelo para não dar conflito infinito
             if [ "$REPO" = "$MODEL_REPO" ]; then continue; fi
             
-            echo "Processando repositório: $REPO"
+            echo "----------------------------------------"
+            echo "📦 Processando repositório: $REPO"
             
-            # Tenta clonar. Se der erro (ex: falta de permissão), pula para o próximo
-            git clone https://$PAT_TOKEN@://github.com || continue
+            # Tenta clonar. Se der erro, pula para o próximo
+            git clone https://$PAT_TOKEN@://github.com || { echo "⚠️ Falha ao clonar $REPO. Pulando..."; continue; }
             
             # Garante que a pasta de templates existe no destino
             mkdir -p $REPO/.github/ISSUE_TEMPLATE/
             
-            # Copia os templates comuns sem apagar o que o desenvolvedor criou de específico lá
+            # Copia os templates comuns sem apagar os específicos locais
             cp .github/ISSUE_TEMPLATE/* $REPO/.github/ISSUE_TEMPLATE/
             
             cd $REPO
